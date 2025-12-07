@@ -1,4 +1,4 @@
-# Stardust CLI
+# Stardust
 
 [English](README.md) | 한국어
 
@@ -38,7 +38,7 @@ Type: ETC
 ### npm을 통한 전역 설치 (권장)
 
 ```bash
-npm install -g stardust-cli
+npm install -g @hellosunghyun/stardust
 ```
 
 설치 후 `stardust` 명령어를 바로 사용할 수 있습니다:
@@ -51,8 +51,8 @@ stardust run
 
 ```bash
 # 저장소 클론
-git clone https://github.com/hellosunghyun/stardust-cli.git
-cd stardust-cli
+git clone https://github.com/hellosunghyun/stardust.git
+cd stardust
 
 # 의존성 설치
 npm install
@@ -281,7 +281,7 @@ stardust classify
 ## 프로젝트 구조
 
 ```
-stardust-cli/
+stardust/
 ├── package.json
 ├── tsconfig.json
 ├── .env.example

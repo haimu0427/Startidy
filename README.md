@@ -1,4 +1,4 @@
-# Stardust CLI
+# Stardust
 
 English | [한국어](README.ko.md)
 
@@ -38,7 +38,7 @@ Type: ETC
 ### Global Install via npm (Recommended)
 
 ```bash
-npm install -g stardust-cli
+npm install -g @hellosunghyun/stardust
 ```
 
 After installation, you can use the `stardust` command directly:
@@ -51,8 +51,8 @@ stardust run
 
 ```bash
 # Clone the repository
-git clone https://github.com/hellosunghyun/stardust-cli.git
-cd stardust-cli
+git clone https://github.com/hellosunghyun/stardust.git
+cd stardust
 
 # Install dependencies
 npm install
@@ -281,7 +281,7 @@ stardust classify
 ## Project Structure
 
 ```
-stardust-cli/
+stardust/
 ├── package.json
 ├── tsconfig.json
 ├── .env.example
