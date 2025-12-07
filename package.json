@@ -1,6 +1,6 @@
 {
-  "name": "stardust-cli",
-  "version": "1.0.0",
+  "name": "@hellosunghyun/stardust",
+  "version": "0.1.0",
   "description": "AI-powered CLI tool to automatically organize your GitHub Stars into Lists",
   "type": "module",
   "bin": {
@@ -26,16 +26,16 @@
     "cli",
     "automation"
   ],
-  "author": "",
+  "author": "hellosunghyun",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hellosunghyun/stardust-cli.git"
+    "url": "git+https://github.com/hellosunghyun/stardust.git"
   },
   "bugs": {
-    "url": "https://github.com/hellosunghyun/stardust-cli/issues"
+    "url": "https://github.com/hellosunghyun/stardust/issues"
   },
-  "homepage": "https://github.com/hellosunghyun/stardust-cli#readme",
+  "homepage": "https://github.com/hellosunghyun/stardust#readme",
   "engines": {
     "node": ">=18.0.0"
   },
