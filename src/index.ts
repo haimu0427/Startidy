@@ -5,6 +5,10 @@ import { planCommand } from "./commands/plan";
 import { createListsCommand } from "./commands/create-lists";
 import { classifyCommand } from "./commands/classify";
 import { runCommand } from "./commands/run";
+import { checkForUpdates } from "./utils/update-checker";
+
+// Check for updates in the background (non-blocking)
+checkForUpdates();
 
 const program = new Command();
 
