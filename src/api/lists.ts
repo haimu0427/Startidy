@@ -65,6 +65,7 @@ interface UpdateUserListsForItemResponse {
 
 /**
  * Fetches all GitHub lists and their repositories for a given user
+ * Uses pagination to avoid GraphQL resource limits
  */
 export async function fetchGitHubLists(
   username: string,
@@ -74,11 +75,16 @@ export async function fetchGitHubLists(
     throw new Error("Missing GitHub username parameter");
   }
 
-  const query = `
-    query FetchUserLists($username: String!) {
+  // First, fetch just the lists (without items) to avoid resource limits
+  const listsQuery = `
+    query FetchUserLists($username: String!, $cursor: String) {
       user(login: $username) {
-        lists(first: 100) {
+        lists(first: 20, after: $cursor) {
           totalCount
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
           nodes {
             id
             name
@@ -88,18 +94,79 @@ export async function fetchGitHubLists(
             slug
             createdAt
             updatedAt
-            items(first: 100) {
+            items(first: 0) {
               totalCount
-              nodes {
-                __typename
-                ... on Repository {
-                  name
-                  url
-                  isPrivate
-                  description
-                  stargazerCount
-                  owner { login }
-                }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  interface ListsOnlyResponse {
+    user: {
+      lists: {
+        totalCount: number;
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: Array<{
+          id: string;
+          name: string;
+          description: string | null;
+          isPrivate: boolean;
+          lastAddedAt: string | null;
+          slug: string;
+          createdAt: string;
+          updatedAt: string;
+          items: { totalCount: number };
+        }>;
+      };
+    } | null;
+  }
+
+  // Fetch all lists with pagination
+  const allLists: ListsOnlyResponse["user"]["lists"]["nodes"] = [];
+  let cursor: string | null = null;
+  let totalCount = 0;
+
+  do {
+    const data = await graphql<ListsOnlyResponse>(token, listsQuery, {
+      username,
+      cursor,
+    });
+
+    if (!data.user?.lists) {
+      throw new Error("GitHub API returned unexpected data structure");
+    }
+
+    totalCount = data.user.lists.totalCount;
+    allLists.push(...data.user.lists.nodes);
+
+    if (data.user.lists.pageInfo.hasNextPage) {
+      cursor = data.user.lists.pageInfo.endCursor;
+    } else {
+      cursor = null;
+    }
+  } while (cursor);
+
+  // Fetch items for each list individually to avoid resource limits
+  const itemsQuery = `
+    query FetchListItems($listId: ID!, $cursor: String) {
+      node(id: $listId) {
+        ... on UserList {
+          items(first: 50, after: $cursor) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              __typename
+              ... on Repository {
+                name
+                url
+                isPrivate
+                description
+                stargazerCount
+                owner { login }
               }
             }
           }
@@ -108,36 +175,75 @@ export async function fetchGitHubLists(
     }
   `;
 
-  const data = await graphql<UserListsResponse>(token, query, { username });
-
-  if (!data.user?.lists) {
-    throw new Error("GitHub API returned unexpected data structure");
+  interface ListItemsResponse {
+    node: {
+      items: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: Array<{
+          __typename: string;
+          name?: string;
+          url?: string;
+          isPrivate?: boolean;
+          description?: string | null;
+          stargazerCount?: number;
+          owner?: { login: string };
+        }>;
+      };
+    } | null;
   }
+
+  const formattedLists = await Promise.all(
+    allLists.map(async (list) => {
+      const allItems: ListItemsResponse["node"]["items"]["nodes"] = [];
+      let itemCursor: string | null = null;
+
+      do {
+        const itemsData = await graphql<ListItemsResponse>(token, itemsQuery, {
+          listId: list.id,
+          cursor: itemCursor,
+        });
+
+        if (itemsData.node?.items) {
+          allItems.push(...itemsData.node.items.nodes);
+
+          if (itemsData.node.items.pageInfo.hasNextPage) {
+            itemCursor = itemsData.node.items.pageInfo.endCursor;
+          } else {
+            itemCursor = null;
+          }
+        } else {
+          itemCursor = null;
+        }
+      } while (itemCursor);
+
+      return {
+        id: list.id,
+        name: list.name,
+        description: list.description,
+        isPrivate: list.isPrivate,
+        slug: list.slug,
+        createdAt: list.createdAt,
+        updatedAt: list.updatedAt,
+        lastAddedAt: list.lastAddedAt,
+        totalRepositories: list.items.totalCount,
+        repositories: allItems
+          .filter((item): item is GitHubListItem => item.__typename === "Repository")
+          .map((repo) => ({
+            name: repo.name,
+            url: repo.url,
+            isPrivate: repo.isPrivate,
+            description: repo.description,
+            stars: repo.stargazerCount,
+            owner: repo.owner.login,
+          })),
+      };
+    }),
+  );
 
   return {
     username,
-    totalLists: data.user.lists.totalCount,
-    lists: data.user.lists.nodes.map((list) => ({
-      id: list.id,
-      name: list.name,
-      description: list.description,
-      isPrivate: list.isPrivate,
-      slug: list.slug,
-      createdAt: list.createdAt,
-      updatedAt: list.updatedAt,
-      lastAddedAt: list.lastAddedAt,
-      totalRepositories: list.items.totalCount,
-      repositories: list.items.nodes
-        .filter((item): item is GitHubListItem => item.__typename === "Repository")
-        .map((repo) => ({
-          name: repo.name,
-          url: repo.url,
-          isPrivate: repo.isPrivate,
-          description: repo.description,
-          stars: repo.stargazerCount,
-          owner: repo.owner.login,
-        })),
-    })),
+    totalLists: totalCount,
+    lists: formattedLists,
   };
 }
 
