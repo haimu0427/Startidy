@@ -7,6 +7,69 @@ const GITHUB_API_URL = "https://api.github.com";
 const GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
 const USER_AGENT = "Stardust-CLI";
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_DELAY_MS = 1000;
+
+/**
+ * Sleep for a given number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if an error is retryable (5xx server errors)
+ */
+function isRetryableStatus(status: number): boolean {
+  return status >= 500 && status < 600;
+}
+
+/**
+ * Execute a fetch request with retry logic
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = MAX_RETRIES,
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // If successful or non-retryable error, return immediately
+      if (response.ok || !isRetryableStatus(response.status)) {
+        return response;
+      }
+
+      // For retryable errors, save and continue to retry
+      if (attempt < retries) {
+        const delay = INITIAL_DELAY_MS * Math.pow(2, attempt);
+        console.error(
+          `\n⚠️  Server error (${response.status}). Retrying in ${delay / 1000}s... (${attempt + 1}/${retries})`,
+        );
+        await sleep(delay);
+      } else {
+        return response; // Return last failed response
+      }
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt < retries) {
+        const delay = INITIAL_DELAY_MS * Math.pow(2, attempt);
+        console.error(
+          `\n⚠️  Network error. Retrying in ${delay / 1000}s... (${attempt + 1}/${retries})`,
+        );
+        await sleep(delay);
+      }
+    }
+  }
+
+  throw lastError || new Error("Request failed after retries");
+}
+
 export interface GitHubClientConfig {
   token: string;
 }
@@ -35,7 +98,7 @@ export async function graphql<T = unknown>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
-  const response = await fetch(GITHUB_GRAPHQL_URL, {
+  const response = await fetchWithRetry(GITHUB_GRAPHQL_URL, {
     method: "POST",
     headers: {
       "User-Agent": USER_AGENT,
@@ -80,7 +143,7 @@ export async function rest<T = unknown>(
 ): Promise<{ data: T; status: number }> {
   const url = endpoint.startsWith("http") ? endpoint : `${GITHUB_API_URL}${endpoint}`;
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     ...options,
     headers: {
       "User-Agent": USER_AGENT,
