@@ -2,7 +2,9 @@
 
 This file provides guidance to Claude Code and other agent hosts when working with code in this repository.
 
-## Commands
+## Package & Commands
+
+- Package: `@haimu0427/startidy` (v2.0.0)
 
 ```bash
 bun install                                # install dependencies
@@ -10,6 +12,7 @@ bun run typegen                            # compile JSON Schemas to src/generat
 bun run build                              # bundle CLI into dist/index.js (ESM, Node >=22 target)
 bun test                                   # run unit and integration tests
 node dist/index.js <command>               # run built CLI via Node
+npx @haimu0427/startidy <command>          # run via npx
 ```
 
 ## Architecture (v2)

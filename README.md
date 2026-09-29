@@ -1,18 +1,25 @@
+<p align="right">
+  <a href="README.en.md">English</a> | <strong>简体中文</strong>
+</p>
+
 # Startidy 🌟
+
+[![npm version](https://img.shields.io/npm/v/@haimu0427/startidy.svg)](https://www.npmjs.com/package/@haimu0427/startidy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > **Contract-driven GitHub Stars organizer for AI agents and developers.**  
 > 让 AI Agent 帮你自动分类、整理混乱的 GitHub Stars 到 GitHub Lists 中，安全、增量且完全受控。
 
 ---
 
-<!-- DEMO_PLACEHOLDER_START -->
+<!-- DEMO_IMAGES_START -->
 <p align="center">
-  <!-- TODO: 在此处替换你的项目演示动图或截图 (推荐 16:9 或终端录屏 gif) -->
-  <img src="./assets/demo.gif" alt="Startidy Demo Preview" width="85%" style="border-radius: 8px; border: 1px solid #e1e4e8;" />
+  <img src="./assets/demo-1.png" alt="AI Agent Workflow" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
+  <img src="./assets/demo-2.png" alt="CLI Preview and Apply" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
   <br>
-  <em>(Demo 动图 / 截图预留位：展示 AI Agent 自动分类与 CLI 执行流程)</em>
+  <em>(左：AI Agent 自动分析与分类规划 / 右：CLI 契约校验与三步安全执行)</em>
 </p>
-<!-- DEMO_PLACEHOLDER_END -->
+<!-- DEMO_IMAGES_END -->
 
 ---
 
@@ -32,9 +39,19 @@
 
 仅需 **3 步**，即可让 AI Agent 帮你自动整理 GitHub Stars：
 
-### 1. 安装与构建
+### 1. 安装方式
 
 确保本机安装了 Node.js (>= 22) 和已登录的 GitHub CLI (`gh auth login`)。
+
+#### 方式 A：通过 npm 全局安装（推荐）
+
+```bash
+npm install -g @haimu0427/startidy
+# 或无需安装直接通过 npx 运行
+npx @haimu0427/startidy doctor
+```
+
+#### 方式 B：从源码本地构建
 
 ```bash
 # 克隆仓库
@@ -94,6 +111,13 @@ AI Agent 会根据 Skill 自动执行标准三阶段流：
 本项目基于并灵感源自 [@hellosunghyun](https://github.com/hellosunghyun) 的开源项目 [hellosunghyun/startidy](https://github.com/hellosunghyun/startidy)。
 
 在此基础上，v2 版本进行了彻底的架构重构：移除了对外部 LLM API 的直接依赖，转而拥抱现代 Agent 体系，演进为一套完全由 Contract 约束、依托 Host Agent 语义理解并具备断点恢复与安全隔离机制的确定性工具链。感谢原作者为 GitHub Lists 自动化整理提供的先驱探索与启发！
+
+---
+
+## 📚 开发者与 Agent 指南
+
+- [AGENTS.md](AGENTS.md)：面向 Codex、Cursor、Antigravity 等各类 AI Agent 宿主的架构契约与调试规范。
+- [CLAUDE.md](CLAUDE.md)：面向 Claude Code 的开发构建与调试备忘。
 
 ---
 
