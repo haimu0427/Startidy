@@ -1,141 +1,102 @@
-# Startidy (v2)
+# Startidy 🌟
 
-Contract-driven GitHub Stars organizer for AI agents and developers.
-
-Organize your starred repositories into structured GitHub User Lists safely, deterministically, and incrementally.
-
----
-
-## What's New in v2
-
-- **Host Agent Reasoning**: No LLM API keys required. Startidy relies on your host agent (Claude Code, Codex, Cursor, etc.) for taxonomy reasoning and classification via an [Agent Skill](skills/startidy/SKILL.md).
-- **Strict Data Contracts**: All data exchange is defined by JSON Schema 2020-12 (`snapshot`, `plan`, `review`).
-- **Safe & Incremental by Default**: Existing lists and memberships are preserved. Incremental mode prevents unauthorized deletions or renames.
-- **Preview & Review Before Execution**: Every planned change generates a verified `review.json` with cryptographic digest and atomic operations.
-- **Crash Recovery & Idempotence**: Interrupted runs are journaled before each write. A uniquely verifiable remote result resumes safely; ambiguous create results stop as `needs_review` rather than risking a duplicate List.
-- **Zero Token Leakage**: Uses the authenticated GitHub CLI (`gh`) under the hood.
+> **Contract-driven GitHub Stars organizer for AI agents and developers.**  
+> 让 AI Agent 帮你自动分类、整理混乱的 GitHub Stars 到 GitHub Lists 中，安全、增量且完全受控。
 
 ---
 
-## Prerequisites
-
-1. **Node.js**: Version `>= 22.0.0`
-2. **GitHub CLI (`gh`)**: Installed and authenticated (`gh auth login`) with read/write access to user lists.
-
-Run diagnostic check:
-```bash
-startidy doctor --json
-```
-
----
-
-## Installation
-
-### 1. Install CLI
-
-```bash
-# Global install via npm
-npm install -g startidy
-
-# Or run via npx
-npx startidy --help
-```
-
-### 2. Install Agent Skill
-
-Startidy provides a universal agent skill in [`skills/startidy/`](skills/startidy/):
-- **Claude Code**: Copy or link `skills/startidy` to `.claude/skills/startidy`
-- **Codex / ChatGPT**: Copy or link `skills/startidy` to `.agents/skills/startidy`
-- **Cursor**: Reference `skills/startidy/SKILL.md` in project skills
+<!-- DEMO_PLACEHOLDER_START -->
+<p align="center">
+  <!-- TODO: 在此处替换你的项目演示动图或截图 (推荐 16:9 或终端录屏 gif) -->
+  <img src="./assets/demo.gif" alt="Startidy Demo Preview" width="85%" style="border-radius: 8px; border: 1px solid #e1e4e8;" />
+  <br>
+  <em>(Demo 动图 / 截图预留位：展示 AI Agent 自动分类与 CLI 执行流程)</em>
+</p>
+<!-- DEMO_PLACEHOLDER_END -->
 
 ---
 
-## Three-Phase Workflow
+## 💡 为什么需要 Startidy？
 
-```text
-User ⇄ Host Agent / Skill
-        │ (reads snapshot, classifies repos, constructs plan.json)
-        ▼
-   startidy CLI
-        │ (parses args, validates JSON Schema/policy, produces review.json, executes)
-        ▼
-      core (pure domain logic: ports, snapshot, candidates, plan, policy, diff, executor)
-        ▼
-    adapters (github-gh via `gh api`, file-store with account isolation & locking)
-```
+随着 Star 的仓库越来越多（几百甚至数千个），GitHub 官方的 Lists 整理起来费时费力。普通脚本要么容易误删分类，要么需要把敏感 Token 喂给第三方大模型。
 
-### Phase 1: Observation & Snapshot
-```bash
-# Capture full state of Stars, Lists, and candidates
-startidy snapshot --out snapshot.json --json
-
-# Read README contents for candidate repositories in batches
-startidy details --snapshot snapshot.json --candidates --offset 0 --limit 20 --out details.json --json
-```
-
-### Phase 2: Plan & Preview
-The agent formulates categories and decisions according to [plan-format.md](skills/startidy/references/plan-format.md) and validates the plan:
-```bash
-startidy preview --snapshot snapshot.json --plan plan.json --out review.json --json
-```
-The preview outputs a verified `review.json` with exact counts of additions, list creations, and deferred items.
-
-### Phase 3: Apply & Recovery
-```bash
-# Apply verified review
-startidy apply --review review.json --json
-
-# In case of network interruption or rate limiting:
-startidy status --run <runId> --json
-startidy apply --resume <runId> --json
-```
-
-If status is `needs_review`, inspect the reported operation and remote List state first. Resume performs read-back reconciliation; it never blindly retries an unprovable List creation.
-
-Record an explicit resolution before resuming:
-
-```bash
-# Adopt an exactly matching existing List for a blocked CreateList
-startidy resolve --run <runId> --action adopt --list-id <listId> --json
-
-# Explicitly retry, accept current remote state, or stop the run
-startidy resolve --run <runId> --action retry --json
-startidy resolve --run <runId> --action accept-current --json
-startidy resolve --run <runId> --action abort --json
-
-startidy apply --resume <runId> --json
-```
+**Startidy v2 采用全新的“Agent + 契约驱动”模式：**
+1. **Agent 负责大脑，CLI 负责手脚**：不需要配置任何 LLM API Key，直接由你日常使用的 AI（Claude Code、Codex、Cursor、Gemini 等）做语义理解与分类规划。
+2. **严格的契约保障（Contract-Driven）**：通过 JSON Schema 严格校验输入输出，杜绝 AI 幻觉引发的破坏性操作。
+3. **安全三步走（Snapshot → Preview → Apply）**：每次操作前生成清晰的变更预览（Review），只有你确认后才会写入 GitHub。
+4. **增量安全保护**：默认保留已有分类，支持网络中断断点续传（Resume），绝不重复创建同名 List。
 
 ---
 
-## Command Reference
+## ⚡ 快速开始 (Quick Start)
 
-| Command | Purpose | Key Flags |
+仅需 **3 步**，即可让 AI Agent 帮你自动整理 GitHub Stars：
+
+### 1. 安装与构建
+
+确保本机安装了 Node.js (>= 22) 和已登录的 GitHub CLI (`gh auth login`)。
+
+```bash
+# 克隆仓库
+git clone https://github.com/haimu0427/Startidy.git
+cd Startidy
+
+# 安装依赖并构建
+bun install
+bun run build
+
+# 链接到全局命令行 (可在任何目录使用 startidy 命令)
+bun link   # 或使用 npm link
+```
+
+验证环境状态：
+```bash
+startidy doctor
+```
+
+### 2. 载入 Agent Skill
+
+Startidy 在 [`skills/startidy/`](skills/startidy/) 目录下提供了符合标准的 Agent Skill，支持各种主流 AI 终端：
+
+* **Claude Code**: 将 `skills/startidy` 软链接或复制到 `.claude/skills/startidy`
+* **Codex / ChatGPT / Antigravity**: 软链接或复制到 `.agents/skills/startidy`
+* **Cursor**: 在项目技能/Rules 中引入 `skills/startidy/SKILL.md`
+
+### 3. 让 AI 对话执行！
+
+现在，打开你的 AI 终端（如 Claude Code 或 Cursor），直接向它发指令：
+
+> **“请帮我分析我的 GitHub Stars，并规划一份合理的分类列表帮我整理。”**
+
+AI Agent 会根据 Skill 自动执行标准三阶段流：
+1. **读取状态**：执行 `startidy snapshot` 获取当前所有 Stars 和 Lists 详情。
+2. **语义规划 & 预览**：根据仓库简介自动归类，生成 `plan.json` 并调用 `startidy preview` 生成变更预览，向你展示将要创建的列表及归类方案。
+3. **安全应用**：当你确认方案满意后，AI 执行 `startidy apply` 安全同步至 GitHub。
+
+---
+
+## 🛠️ CLI 常用指令参考
+
+| 命令 | 用途 | 关键参数 |
 | :--- | :--- | :--- |
-| `startidy doctor` | Verify Node, gh CLI, and auth | `--json` |
-| `startidy snapshot` | Capture current Stars and Lists | `--out <file>`, `--json` |
-| `startidy details` | Retrieve READMEs with caching | `--snapshot <file>`, `--candidates`, `--repo-id <id...>`, `--offset <n>`, `--limit <n>`, `--out <file>` |
-| `startidy preview` | Validate plan and generate review | `--snapshot <file>`, `--plan <file>`, `--out <file>` |
-| `startidy apply` | Execute verified operations | `--review <file>`, `--resume <runId>` |
-| `startidy resolve` | Resolve a blocked operation | `--run <runId>`, `--action <action>`, `--list-id <id>` |
-| `startidy status` | Check run progress & journal | `--run <runId>` |
-
-All commands accept `--state-dir <dir>` to override the local state directory.
+| `startidy doctor` | 检查 Node、gh 登录态和依赖环境 | `--json` |
+| `startidy snapshot` | 抓取当前所有 Stars 与 Lists 快照 | `--out <file>`, `--json` |
+| `startidy details` | 批量拉取候选仓库的 README 补充信息 | `--snapshot <file>`, `--candidates`, `--limit 20` |
+| `startidy preview` | 校验分类计划并生成变更预览 diff | `--snapshot <file>`, `--plan <file>`, `--out <file>` |
+| `startidy apply` | 执行已经校验的变更或恢复中断任务 | `--review <file>`, `--resume <runId>` |
+| `startidy status` | 查看指定运行任务的执行日志与状态 | `--run <runId>` |
+| `startidy resolve` | 处理由于网络或冲突阻断的异常状态 | `--run <runId>`, `--action <adopt/retry/abort>` |
 
 ---
 
-## Exit Codes
+## 🤝 致谢 (Acknowledgements)
 
-- `0`: Success / No change
-- `2`: Invalid input / Schema validation failure / Policy violation
-- `3`: Dependency missing / GitHub authentication failed
-- `4`: State conflict / Snapshot stale / Account lock held
-- `5`: Rate limit or network retry budget exhausted
-- `6`: Partial execution / Resumable state recorded
-- `1`: Unexpected internal error
+本项目基于并灵感源自 [@hellosunghyun](https://github.com/hellosunghyun) 的开源项目 [hellosunghyun/startidy](https://github.com/hellosunghyun/startidy)。
+
+在此基础上，v2 版本进行了彻底的架构重构：移除了对外部 LLM API 的直接依赖，转而拥抱现代 Agent 体系，演进为一套完全由 Contract 约束、依托 Host Agent 语义理解并具备断点恢复与安全隔离机制的确定性工具链。感谢原作者为 GitHub Lists 自动化整理提供的先驱探索与启发！
 
 ---
 
-## License
+## 📄 License
 
-MIT
+[MIT License](LICENSE) © 2024 hellosunghyun & © 2026 haimu0427

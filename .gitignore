@@ -30,3 +30,14 @@ bun.lockb
 
 # Claude Code
 .claude/
+
+# Internal docs & design notes
+docs/
+
+# CLI Runtime Artifacts & Snapshots (User specific)
+*.json
+!package.json
+!tsconfig.json
+!bun.lock
+!src/schemas/*.json
+!skills/**/*.json
