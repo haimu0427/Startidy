@@ -14,6 +14,6 @@
     "rootDir": ".",
     "types": ["bun-types"]
   },
-  "include": ["src/**/*", "github-lists-api.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

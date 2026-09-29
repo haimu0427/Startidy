@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://startidy.dev/schemas/review.schema.json",
+  "title": "Review",
+  "description": "Portable preview and execution contract binding plan, baseline, operations, and digest.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "reviewId",
+    "createdAt",
+    "account",
+    "baseSnapshotId",
+    "stateRevision",
+    "plan",
+    "digest",
+    "operations",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "reviewId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "account": {
+      "type": "object",
+      "required": ["hostname", "viewerId"],
+      "additionalProperties": false,
+      "properties": {
+        "hostname": { "type": "string", "minLength": 1 },
+        "viewerId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "baseSnapshotId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stateRevision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "plan": {
+      "$ref": "plan.schema.json"
+    },
+    "digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["opId", "type", "params", "dependencies"],
+        "additionalProperties": false,
+        "properties": {
+          "opId": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["CreateList", "UpdateList", "SetMemberships", "DeleteList"]
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "sourceDecisionRepoId": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "totalCandidates",
+        "creates",
+        "updates",
+        "deletes",
+        "membershipChanges",
+        "deferred",
+        "ignored"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "totalCandidates": { "type": "integer", "minimum": 0 },
+        "creates": { "type": "integer", "minimum": 0 },
+        "updates": { "type": "integer", "minimum": 0 },
+        "deletes": { "type": "integer", "minimum": 0 },
+        "membershipChanges": { "type": "integer", "minimum": 0 },
+        "deferred": { "type": "integer", "minimum": 0 },
+        "ignored": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

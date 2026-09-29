@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://startidy.dev/schemas/snapshot.schema.json",
+  "title": "Snapshot",
+  "description": "Normalized observation snapshot of a user's GitHub Stars and Lists state.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "snapshotId",
+    "capturedAt",
+    "account",
+    "coverage",
+    "repositories",
+    "lists",
+    "stateRevision",
+    "candidates"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "snapshotId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "account": {
+      "type": "object",
+      "required": ["hostname", "viewerId", "login"],
+      "additionalProperties": false,
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "viewerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "login": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["starsComplete", "listsComplete", "membershipsComplete"],
+      "additionalProperties": false,
+      "properties": {
+        "starsComplete": { "type": "boolean" },
+        "listsComplete": { "type": "boolean" },
+        "membershipsComplete": { "type": "boolean" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "repositories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "owner", "name", "isStarred"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": ["string", "null"] },
+          "primaryLanguage": { "type": ["string", "null"] },
+          "isStarred": { "type": "boolean" }
+        }
+      }
+    },
+    "lists": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "isPrivate", "repositoryIds"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": ["string", "null"] },
+          "isPrivate": { "type": "boolean" },
+          "repositoryIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "unsupportedItemCount": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        }
+      }
+    },
+    "stateRevision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "namingLanguage": { "type": "string" },
+        "allowMultiCategory": { "type": "boolean" },
+        "defaultListPrivacy": { "type": "string", "enum": ["public", "private"] }
+      }
+    },
+    "ledgerSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "totalTracked": { "type": "integer", "minimum": 0 },
+        "lastRunId": { "type": ["string", "null"] }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repoId", "reason", "suggestedAction"],
+        "additionalProperties": false,
+        "properties": {
+          "repoId": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "suggestedAction": {
+            "type": "string",
+            "enum": ["assign", "keep", "defer", "ignore"]
+          }
+        }
+      }
+    },
+    "pendingRunId": {
+      "type": ["string", "null"]
+    }
+  }
+}

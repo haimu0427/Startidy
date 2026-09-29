@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://startidy.dev/schemas/plan.schema.json",
+  "title": "Plan",
+  "description": "Explicit user and agent classification and change plan.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "account",
+    "baseSnapshotId",
+    "mode",
+    "scope",
+    "lists",
+    "decisions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "account": {
+      "type": "object",
+      "required": ["hostname", "viewerId"],
+      "additionalProperties": false,
+      "properties": {
+        "hostname": { "type": "string", "minLength": 1 },
+        "viewerId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "baseSnapshotId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["bootstrap", "incremental", "targeted", "full"]
+    },
+    "scope": {
+      "type": "object",
+      "required": ["repoIds", "listIds"],
+      "additionalProperties": false,
+      "properties": {
+        "repoIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "listIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "lists": {
+      "type": "object",
+      "required": ["create", "update", "delete"],
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "name", "isPrivate"],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]+$",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "isPrivate": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "update": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["listId", "changes", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "listId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "changes": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": false,
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "description": { "type": ["string", "null"] },
+                  "isPrivate": { "type": "boolean" }
+                }
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "delete": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["listId", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "listId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "title": "AssignDecision",
+            "required": ["repoId", "outcome", "addTo", "removeFrom", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "repoId": { "type": "string", "minLength": 1 },
+              "outcome": { "const": "assign" },
+              "addTo": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": ["listId"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "listId": { "type": "string", "minLength": 1 }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": ["newListKey"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "newListKey": { "type": "string", "minLength": 1 }
+                      }
+                    }
+                  ]
+                }
+              },
+              "removeFrom": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["listId"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "listId": { "type": "string", "minLength": 1 }
+                  }
+                }
+              },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          },
+          {
+            "type": "object",
+            "title": "KeepDecision",
+            "required": ["repoId", "outcome"],
+            "additionalProperties": false,
+            "properties": {
+              "repoId": { "type": "string", "minLength": 1 },
+              "outcome": { "const": "keep" },
+              "reason": { "type": "string" }
+            }
+          },
+          {
+            "type": "object",
+            "title": "DeferDecision",
+            "required": ["repoId", "outcome", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "repoId": { "type": "string", "minLength": 1 },
+              "outcome": { "const": "defer" },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          },
+          {
+            "type": "object",
+            "title": "IgnoreDecision",
+            "required": ["repoId", "outcome", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "repoId": { "type": "string", "minLength": 1 },
+              "outcome": { "const": "ignore" },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        ]
+      }
+    },
+    "preferencesUpdate": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
