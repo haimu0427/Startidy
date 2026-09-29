@@ -14,12 +14,26 @@
 
 <!-- DEMO_IMAGES_START -->
 <p align="center">
-  <img src="./assets/demo-1.png" alt="AI Agent Workflow" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
-  <img src="./assets/demo-2.png" alt="CLI Preview and Apply" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
+  <img src="./assets/demo-1.png" alt="GitHub Lists 实际整理效果" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
+  <img src="./assets/demo-2.png" alt="AI Agent 执行与原子校验" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
   <br>
-  <em>(左：AI Agent 自动分析与分类规划 / 右：CLI 契约校验与三步安全执行)</em>
+  <em>(左：AI 整理后的 GitHub Lists 真实效果 / 右：AI Agent 执行过程与原子操作校验战报)</em>
 </p>
 <!-- DEMO_IMAGES_END -->
+
+---
+
+## ⚡ 极速开始：让 AI Agent 自动搞定一切
+
+如果你正在使用 **Claude Code / Cursor / Codex / Antigravity**，你甚至不需要手动敲命令，只需把下面这段 Prompt 复制发送给你的 AI：
+
+> **🤖 复制发给 AI Agent 的一行流指令：**
+>
+> ```text
+> 请帮我初始化 GitHub Stars 整理工具 Startidy：先运行 npm install -g @haimu0427/startidy 并执行 startidy doctor 检查环境；接着读取并加载仓库 https://github.com/haimu0427/Startidy 中的 skills/startidy/SKILL.md（如果在本地已克隆则读取本地文件）；配置完毕后向我汇报就绪状态，并等待我发出整理 Stars 的具体指令。
+> ```
+
+AI Agent 初始化就绪后，你只需回复一句：**“请帮我分析我的 GitHub Stars，并规划一份合理的分类列表帮我整理。”** 即可全自动执行！
 
 ---
 
@@ -35,9 +49,9 @@
 
 ---
 
-## ⚡ 快速开始 (Quick Start)
+## 🛠️ 手动安装与使用 (Manual Setup)
 
-仅需 **3 步**，即可让 AI Agent 帮你自动整理 GitHub Stars：
+如果你习惯在终端手动操作，仅需以下 3 步：
 
 ### 1. 安装方式
 
@@ -79,20 +93,15 @@ Startidy 在 [`skills/startidy/`](skills/startidy/) 目录下提供了符合标�
 * **Codex / ChatGPT / Antigravity**: 软链接或复制到 `.agents/skills/startidy`
 * **Cursor**: 在项目技能/Rules 中引入 `skills/startidy/SKILL.md`
 
-### 3. 让 AI 对话执行！
+### 3. 三阶段执行流程
 
-现在，打开你的 AI 终端（如 Claude Code 或 Cursor），直接向它发指令：
-
-> **“请帮我分析我的 GitHub Stars，并规划一份合理的分类列表帮我整理。”**
-
-AI Agent 会根据 Skill 自动执行标准三阶段流：
-1. **读取状态**：执行 `startidy snapshot` 获取当前所有 Stars 和 Lists 详情。
-2. **语义规划 & 预览**：根据仓库简介自动归类，生成 `plan.json` 并调用 `startidy preview` 生成变更预览，向你展示将要创建的列表及归类方案。
+1. **读取状态**：执行 `startidy snapshot` 获取当前所有 Stars 和 Lists 快照。
+2. **语义规划 & 预览**：AI 根据仓库简介自动归类生成 `plan.json`，并调用 `startidy preview` 生成变更预览供你审核。
 3. **安全应用**：当你确认方案满意后，AI 执行 `startidy apply` 安全同步至 GitHub。
 
 ---
 
-## 🛠️ CLI 常用指令参考
+## 📖 CLI 常用指令参考
 
 | 命令 | 用途 | 关键参数 |
 | :--- | :--- | :--- |
