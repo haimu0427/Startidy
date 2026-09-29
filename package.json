@@ -1,17 +1,21 @@
 {
   "name": "startidy",
-  "version": "1.0.2",
-  "description": "AI-powered CLI tool to automatically organize your GitHub Stars into Lists",
+  "version": "2.0.0",
+  "description": "Contract-driven GitHub Stars organizer for agents and developers",
   "type": "module",
   "bin": {
     "startidy": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "skills",
+    "src/schemas"
   ],
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node --format esm",
+    "typegen": "node scripts/generate-types.js",
+    "test": "bun test",
     "start": "bun run src/index.ts",
     "dev": "bun run src/index.ts",
     "prepublishOnly": "npm run build"
@@ -22,7 +26,8 @@
     "lists",
     "organize",
     "ai",
-    "gemini",
+    "ai-agent",
+    "agent-skills",
     "cli",
     "automation"
   ],
@@ -37,18 +42,17 @@
   },
   "homepage": "https://github.com/hellosunghyun/startidy#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
-    "openai": "^4.0.0",
-    "@inquirer/prompts": "^7.0.0",
-    "commander": "^12.1.0",
-    "dotenv": "^17.2.3",
-    "ora": "^8.1.0"
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "commander": "^12.1.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^20.0.0",
+    "json-schema-to-typescript": "^16.0.0",
     "typescript": "^5.6.0"
   }
 }
