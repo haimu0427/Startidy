@@ -75,6 +75,28 @@ describe('Phase 2: Adapters Verification', () => {
         return true;
       });
     });
+
+    it('omits description when updating unrelated list fields', async () => {
+      let payload: { variables?: { input?: Record<string, unknown> } } | undefined;
+      const executor: GhExecutor = async (_args, stdin) => {
+        payload = JSON.parse(stdin ?? '{}');
+        return { stdout: JSON.stringify({ data: { updateUserList: { list: { id: 'L_1' } } } }), stderr: '', exitCode: 0 };
+      };
+      const adapter = new GitHubGhAdapter({ executor });
+      await adapter.updateList({ listId: 'L_1', changes: { name: 'Renamed' } });
+      assert.deepEqual(payload?.variables?.input, { listId: 'L_1', name: 'Renamed' });
+    });
+
+    it('sends an explicit null description when requested', async () => {
+      let payload: { variables?: { input?: Record<string, unknown> } } | undefined;
+      const executor: GhExecutor = async (_args, stdin) => {
+        payload = JSON.parse(stdin ?? '{}');
+        return { stdout: JSON.stringify({ data: { updateUserList: { list: { id: 'L_1' } } } }), stderr: '', exitCode: 0 };
+      };
+      const adapter = new GitHubGhAdapter({ executor });
+      await adapter.updateList({ listId: 'L_1', changes: { description: null } });
+      assert.deepEqual(payload?.variables?.input, { listId: 'L_1', description: null });
+    });
   });
 
   describe('File Store Adapter', () => {
@@ -129,6 +151,60 @@ describe('Phase 2: Adapters Verification', () => {
       const lock2 = await store.acquireLock(account, 'run_2');
       assert.equal(lock2.runId, 'run_2');
       await lock2.release();
+    });
+
+    it('does not steal an old lock while its owning process is alive', async () => {
+      const store = new FileStoreAdapter({ stateDir: tempDir });
+      const account = { hostname: 'github.com', viewerId: 'U_lock_old_alive' };
+      const lock = await store.acquireLock(account, 'run_live');
+      const lockPath = path.join(store.baseDir, 'accounts', store.getAccountKey(account), 'account.lock');
+      const payload = JSON.parse(await fsp.readFile(lockPath, 'utf8'));
+      payload.acquiredAt = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+      await fsp.writeFile(lockPath, JSON.stringify(payload), 'utf8');
+
+      await assert.rejects(
+        () => store.acquireLock(account, 'run_contender'),
+        (err: unknown) => err instanceof DomainError && err.code === 'LOCK_HELD'
+      );
+      await lock.release();
+    });
+
+    it('reclaims a lock only after its owner PID is confirmed dead', async () => {
+      const store = new FileStoreAdapter({ stateDir: tempDir });
+      const account = { hostname: 'github.com', viewerId: 'U_lock_dead_owner' };
+      const lockDir = path.join(store.baseDir, 'accounts', store.getAccountKey(account));
+      await fsp.mkdir(lockDir, { recursive: true });
+      await fsp.writeFile(
+        path.join(lockDir, 'account.lock'),
+        JSON.stringify({ runId: 'run_dead', pid: 2147483647, acquiredAt: new Date().toISOString(), ownerToken: 'dead-owner' }),
+        'utf8'
+      );
+
+      const lock = await store.acquireLock(account, 'run_reclaimed');
+      assert.equal(lock.runId, 'run_reclaimed');
+      await lock.release();
+    });
+
+    it('allows only one concurrent reclaimer to replace a dead lock', async () => {
+      const store = new FileStoreAdapter({ stateDir: tempDir });
+      const account = { hostname: 'github.com', viewerId: 'U_lock_concurrent_dead' };
+      const lockDir = path.join(store.baseDir, 'accounts', store.getAccountKey(account));
+      await fsp.mkdir(lockDir, { recursive: true });
+      await fsp.writeFile(
+        path.join(lockDir, 'account.lock'),
+        JSON.stringify({ runId: 'run_dead', pid: 2147483647, acquiredAt: new Date().toISOString(), ownerToken: 'dead-owner' }),
+        'utf8'
+      );
+
+      const attempts = await Promise.allSettled([
+        store.acquireLock(account, 'run_reclaimer_a'),
+        store.acquireLock(account, 'run_reclaimer_b')
+      ]);
+      const acquired = attempts.filter(
+        (attempt): attempt is PromiseFulfilledResult<Awaited<ReturnType<typeof store.acquireLock>>> => attempt.status === 'fulfilled'
+      );
+      assert.equal(acquired.length, 1);
+      await acquired[0].value.release();
     });
 
     it('appends and reads run events reliably', async () => {

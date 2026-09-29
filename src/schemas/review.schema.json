@@ -52,7 +52,7 @@
     },
     "digest": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[a-f0-9]{64}$"
     },
     "operations": {
       "type": "array",

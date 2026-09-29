@@ -3,6 +3,10 @@ import type { Snapshot } from '../generated/snapshot.js';
 import { DomainError } from './errors.js';
 import { validatePlan } from './validation.js';
 
+export function normalizeListName(name: string): string {
+  return name.normalize('NFKC').trim().toLocaleLowerCase('en-US');
+}
+
 export function validatePlanSemantics(plan: Plan, snapshot: Snapshot): void {
   // 1. Schema validation
   validatePlan(plan);
@@ -12,6 +16,8 @@ export function validatePlanSemantics(plan: Plan, snapshot: Snapshot): void {
 
   // 2. Created keys uniqueness
   const createdKeys = new Set<string>();
+  const existingListNames = new Map(snapshot.lists.map((list) => [normalizeListName(list.name), list]));
+  const createdListNames = new Set<string>();
   for (const item of plan.lists.create) {
     if (createdKeys.has(item.key)) {
       throw new DomainError({
@@ -20,6 +26,21 @@ export function validatePlanSemantics(plan: Plan, snapshot: Snapshot): void {
       });
     }
     createdKeys.add(item.key);
+
+    const normalizedName = normalizeListName(item.name);
+    if (existingListNames.has(normalizedName)) {
+      throw new DomainError({
+        code: 'PLAN_INVALID',
+        message: `New list name conflicts with an existing snapshot list: ${item.name}`
+      });
+    }
+    if (createdListNames.has(normalizedName)) {
+      throw new DomainError({
+        code: 'PLAN_INVALID',
+        message: `Duplicate new list name: ${item.name}`
+      });
+    }
+    createdListNames.add(normalizedName);
   }
 
   // 3. Updated lists check

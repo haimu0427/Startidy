@@ -54,6 +54,12 @@ export interface GitHubPort {
   deleteList(input: { listId: string }): Promise<void>;
   setMemberships(input: { repositoryId: string; listIds: string[] }): Promise<{ repositoryId: string; listIds: string[] }>;
   getList(listId: string): Promise<RemoteListInfo | null>;
+  /**
+   * Reads the complete current list graph. This intentionally has no
+   * cross-operation cache: membership mutations replace the whole list set
+   * for an item, so each pre/post-flight check needs a fresh remote view.
+   */
+  readLists(): Promise<RemoteListInfo[]>;
 }
 
 export interface LockHandle {
@@ -97,14 +103,26 @@ export interface AccountLedger {
   entries: Record<string, LedgerEntry>;
 }
 
-export type RunStatus = 'pending' | 'applying' | 'completed' | 'partial' | 'needs_review' | 'failed';
+export type RunStatus = 'pending' | 'applying' | 'completed' | 'partial' | 'needs_review' | 'failed' | 'cancelled';
+
+export type ResolutionAction = 'adopt' | 'retry' | 'accept-current' | 'abort';
 
 export interface RunEvent {
   eventId: string;
   timestamp: string;
   runId: string;
   opId?: string;
-  phase: 'run_start' | 'op_pre_flight' | 'op_in_flight' | 'op_verified' | 'op_failed' | 'op_uncertain' | 'run_finish';
+  phase:
+  | 'run_start'
+  | 'op_pre_flight'
+  | 'op_in_flight'
+  | 'op_verified'
+  | 'op_failed'
+  | 'op_uncertain'
+  | 'op_conflict'
+  | 'op_resolution'
+  | 'run_cancelled'
+  | 'run_finish';
   details?: Record<string, unknown>;
 }
 
@@ -122,6 +140,12 @@ export interface RunResult {
   createdListKeyMap: Record<string, string>;
 }
 
+export interface PendingRun {
+  runId: string;
+  review: Review;
+  result: RunResult | null;
+}
+
 export interface StorePort {
   getAccountKey(account: { hostname: string; viewerId: string }): string;
   acquireLock(account: { hostname: string; viewerId: string }, runId: string): Promise<LockHandle>;
@@ -137,6 +161,8 @@ export interface StorePort {
   saveRunResult(account: { hostname: string; viewerId: string }, runId: string, result: RunResult): Promise<void>;
   loadRunResult(account: { hostname: string; viewerId: string }, runId: string): Promise<RunResult | null>;
   loadReview(account: { hostname: string; viewerId: string }, runId: string): Promise<Review | null>;
+  findRunByReviewDigest(account: { hostname: string; viewerId: string }, digest: string): Promise<{ runId: string; result: RunResult | null } | null>;
+  listPendingRuns(account: { hostname: string; viewerId: string }): Promise<PendingRun[]>;
   getCachedReadme(accountKey: string, repoId: string, sha?: string): Promise<string | null>;
   saveCachedReadme(accountKey: string, repoId: string, sha: string, content: string): Promise<void>;
 }

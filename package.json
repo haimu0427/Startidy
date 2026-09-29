@@ -15,6 +15,7 @@
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node --format esm",
     "typegen": "node scripts/generate-types.js",
+    "typecheck": "tsc --noEmit",
     "test": "bun test",
     "start": "bun run src/index.ts",
     "dev": "bun run src/index.ts",

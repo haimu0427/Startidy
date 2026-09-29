@@ -7,6 +7,7 @@ import { runSnapshot } from './cli/snapshot.js';
 import { runDetails } from './cli/details.js';
 import { runPreview } from './cli/preview.js';
 import { runApply } from './cli/apply.js';
+import { runResolve } from './cli/resolve.js';
 import { runStatus } from './cli/status.js';
 import { printSuccess, printError } from './cli/output.js';
 import { DomainError } from './core/errors.js';
@@ -164,7 +165,38 @@ program
     }
   });
 
-// 6. status
+// 6. resolve
+program
+  .command('resolve')
+  .description('Record an explicit resolution for a needs_review operation')
+  .requiredOption('--run <runId>', 'Run ID awaiting manual resolution')
+  .requiredOption('--action <action>', 'One of: adopt, retry, accept-current, abort')
+  .option('--list-id <id>', 'Existing List ID to adopt (required for adopt)')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { github, store } = getContext(opts);
+    try {
+      const data = await runResolve({
+        github,
+        store,
+        runId: opts.run,
+        action: opts.action,
+        listId: opts.listId
+      });
+      printSuccess('resolve', data, {
+        json: opts.json,
+        summary: data.resumeRequired
+          ? `Recorded ${data.action} for ${data.opId}; run startidy apply --resume ${data.runId} to continue`
+          : `Run ${data.runId} cancelled; verified changes were preserved`
+      });
+      process.exit(0);
+    } catch (err) {
+      const code = printError('resolve', err, { json: opts.json, runId: opts.run });
+      process.exit(code);
+    }
+  });
+
+// 7. status
 program
   .command('status')
   .description('Check execution status and history of a run')
