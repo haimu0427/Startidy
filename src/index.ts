@@ -1,58 +1,196 @@
 #!/usr/bin/env node
-import { config } from "dotenv";
-import { Command } from "commander";
-import { listsCommand } from "./commands/lists";
-import { planCommand } from "./commands/plan";
-import { createListsCommand } from "./commands/create-lists";
-import { classifyCommand } from "./commands/classify";
-import { runCommand } from "./commands/run";
-import { checkForUpdates } from "./utils/update-checker";
-
-// Load .env file from current working directory
-config();
-
-// Check for updates in the background (non-blocking)
-void checkForUpdates();
+import { Command } from 'commander';
+import { GitHubGhAdapter } from './adapters/github-gh.js';
+import { FileStoreAdapter } from './adapters/file-store.js';
+import { runDoctor } from './cli/doctor.js';
+import { runSnapshot } from './cli/snapshot.js';
+import { runDetails } from './cli/details.js';
+import { runPreview } from './cli/preview.js';
+import { runApply } from './cli/apply.js';
+import { runStatus } from './cli/status.js';
+import { printSuccess, printError } from './cli/output.js';
+import { DomainError } from './core/errors.js';
 
 const program = new Command();
 
 program
-  .name("startidy")
-  .description("AI-powered CLI tool to automatically organize your GitHub Stars into Lists")
-  .version("1.0.0")
-  .option("--token <token>", "GitHub Personal Access Token")
-  .option("--username <username>", "GitHub Username")
-  .option("--api-key <key>", "LLM API Key")
-  .option("--max-categories <number>", "Maximum categories (default: 32)")
-  .option("--batch-size <number>", "Batch size for classification (default: 20)")
-  .option("--private", "Create private Lists")
-  .option("--debug", "Enable debug mode")
-  .hook("preAction", (thisCommand) => {
-    const opts = thisCommand.opts();
+  .name('startidy')
+  .description('Contract-driven GitHub Stars organizer for agents and developers')
+  .version('2.0.0')
+  .option('--state-dir <dir>', 'Custom state directory path');
 
-    // Set environment variables from CLI options
-    if (opts.token) process.env.GITHUB_TOKEN = opts.token;
-    if (opts.username) process.env.GITHUB_USERNAME = opts.username;
-    if (opts.apiKey) process.env.LLM_API_KEY = opts.apiKey;
-    if (opts.maxCategories) process.env.MAX_CATEGORIES = opts.maxCategories;
-    if (opts.batchSize) process.env.CLASSIFY_BATCH_SIZE = opts.batchSize;
-    if (opts.private) process.env.LIST_IS_PRIVATE = "true";
-    if (opts.debug) process.env.DEBUG = "true";
+function getContext(cmdOpts: { stateDir?: string }) {
+  const globalOpts = program.opts();
+  const stateDir = cmdOpts.stateDir || globalOpts.stateDir;
+  const store = new FileStoreAdapter({ stateDir });
+  const github = new GitHubGhAdapter();
+  return { store, github };
+}
+
+// 1. doctor
+program
+  .command('doctor')
+  .description('Diagnose environment, dependencies, and GitHub authentication')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { github } = getContext(opts);
+    try {
+      const data = await runDoctor(github);
+      printSuccess('doctor', data, {
+        json: opts.json,
+        summary: `Doctor checks passed: Node ${data.nodeVersion}, gh CLI ${data.ghVersion ?? 'ok'}, Viewer: ${data.viewer?.login}`
+      });
+      process.exit(0);
+    } catch (err) {
+      const code = printError('doctor', err, { json: opts.json });
+      process.exit(code);
+    }
   });
 
-// Individual step commands
-program.addCommand(listsCommand);       // lists - View/delete Lists
-program.addCommand(planCommand);        // plan - Plan categories
-program.addCommand(createListsCommand); // create-lists - Create Lists
-program.addCommand(classifyCommand);    // classify - Classify and add Stars
+// 2. snapshot
+program
+  .command('snapshot')
+  .description('Capture complete GitHub stars, lists, and candidates state')
+  .option('--out <file>', 'Save snapshot to file')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { github, store } = getContext(opts);
+    try {
+      const data = await runSnapshot({ github, store, outPath: opts.out });
+      printSuccess('snapshot', data, {
+        json: opts.json,
+        summary: `Captured snapshot ${data.snapshotId} for ${data.account.login}: ${data.totalStars} stars, ${data.totalLists} lists, ${data.candidatesCount} candidates`
+      });
+      process.exit(0);
+    } catch (err) {
+      const code = printError('snapshot', err, { json: opts.json });
+      process.exit(code);
+    }
+  });
 
-// Full auto execution
-program.addCommand(runCommand);         // run - Full workflow
+// 3. details
+program
+  .command('details')
+  .description('Fetch repo READMEs for candidate or targeted repositories')
+  .requiredOption('--snapshot <file>', 'Snapshot file path')
+  .option('--candidates', 'Target candidate repositories from snapshot')
+  .option('--repo-id <ids...>', 'Target specific repository IDs')
+  .option('--offset <number>', 'Candidate pagination offset', (v) => parseInt(v, 10), 0)
+  .option('--limit <number>', 'Candidate pagination limit', (v) => parseInt(v, 10), 20)
+  .option('--refresh', 'Bypass README cache and fetch fresh from GitHub', false)
+  .option('--out <file>', 'Save details to file')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { github, store } = getContext(opts);
+    try {
+      const data = await runDetails({
+        github,
+        store,
+        snapshotPath: opts.snapshot,
+        candidates: opts.candidates,
+        repoIds: opts.repoId,
+        offset: opts.offset,
+        limit: opts.limit,
+        refresh: opts.refresh,
+        outPath: opts.out
+      });
+      printSuccess('details', data, {
+        json: opts.json,
+        summary: `Fetched details for ${data.count} repositories (offset: ${data.offset}, hasMore: ${data.hasMore})`
+      });
+      process.exit(0);
+    } catch (err) {
+      const code = printError('details', err, { json: opts.json });
+      process.exit(code);
+    }
+  });
 
-// Parse arguments
+// 4. preview
+program
+  .command('preview')
+  .description('Validate plan and generate review preview with digest')
+  .requiredOption('--snapshot <file>', 'Snapshot file path')
+  .requiredOption('--plan <file>', 'Plan file path (or - for stdin)')
+  .option('--out <file>', 'Save review to file')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { store } = getContext(opts);
+    try {
+      const data = await runPreview({
+        store,
+        snapshotPath: opts.snapshot,
+        planPath: opts.plan,
+        outPath: opts.out
+      });
+      printSuccess('preview', data, {
+        json: opts.json,
+        summary: `Generated preview review ${data.reviewId} (digest: ${data.digest.slice(0, 12)}...): ${data.summary.creates} creates, ${data.summary.membershipChanges} memberships, ${data.summary.updates} updates, ${data.summary.deletes} deletes`
+      });
+      process.exit(0);
+    } catch (err) {
+      const code = printError('preview', err, { json: opts.json });
+      process.exit(code);
+    }
+  });
+
+// 5. apply
+program
+  .command('apply')
+  .description('Execute planned review or resume an interrupted run')
+  .option('--review <file>', 'Review file path')
+  .option('--resume <runId>', 'Resume previously interrupted run ID')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { github, store } = getContext(opts);
+    try {
+      const data = await runApply({
+        github,
+        store,
+        reviewPath: opts.review,
+        resumeRunId: opts.resume
+      });
+      printSuccess('apply', data, {
+        json: opts.json,
+        summary: `Run ${data.runId} status: ${data.status} (applied ${data.appliedOperations.length} operations)`
+      });
+      process.exit(0);
+    } catch (err) {
+      const runId =
+        err instanceof DomainError && typeof err.details?.runId === 'string'
+          ? err.details.runId
+          : opts.resume;
+      const code = printError('apply', err, { json: opts.json, runId });
+      process.exit(code);
+    }
+  });
+
+// 6. status
+program
+  .command('status')
+  .description('Check execution status and history of a run')
+  .requiredOption('--run <runId>', 'Run ID to inspect')
+  .option('--json', 'Output machine-readable JSON envelope')
+  .action(async (opts) => {
+    const { github, store } = getContext(opts);
+    try {
+      const data = await runStatus({
+        github,
+        store,
+        runId: opts.run
+      });
+      printSuccess('status', data, {
+        json: opts.json,
+        summary: `Run ${data.runId}: status=${data.status}, resumable=${data.resumable}, events=${data.totalEvents}`
+      });
+      process.exit(0);
+    } catch (err) {
+      const code = printError('status', err, { json: opts.json });
+      process.exit(code);
+    }
+  });
+
 program.parse(process.argv);
 
-// Show help if no command provided
 if (!process.argv.slice(2).length) {
   program.outputHelp();
 }
