@@ -12,7 +12,7 @@ Startidy relies on the host agent for reasoning and classification, while the `s
 
 1. Node.js >= 22.0.0
 2. GitHub CLI (`gh`) authenticated with repository/user scopes (`gh auth login`)
-3. `startidy` CLI installed globally (`npm install -g startidy`) or available locally
+3. `startidy` CLI installed globally (`npm install -g @haimu0427/startidy`) or available locally
 
 Run doctor diagnosis first:
 ```bash
