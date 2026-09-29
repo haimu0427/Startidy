@@ -32,16 +32,16 @@
     "cli",
     "automation"
   ],
-  "author": "hellosunghyun",
+  "author": "haimu0427",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hellosunghyun/startidy.git"
+    "url": "git+https://github.com/haimu0427/Startidy.git"
   },
   "bugs": {
-    "url": "https://github.com/hellosunghyun/startidy/issues"
+    "url": "https://github.com/haimu0427/Startidy/issues"
   },
-  "homepage": "https://github.com/hellosunghyun/startidy#readme",
+  "homepage": "https://github.com/haimu0427/Startidy#readme",
   "engines": {
     "node": ">=22.0.0"
   },
