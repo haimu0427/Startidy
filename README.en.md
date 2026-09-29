@@ -14,12 +14,26 @@
 
 <!-- DEMO_IMAGES_START -->
 <p align="center">
-  <img src="./assets/demo-1.png" alt="AI Agent Workflow" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
-  <img src="./assets/demo-2.png" alt="CLI Preview and Apply" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
+  <img src="./assets/demo-1.png" alt="Organized GitHub Lists" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
+  <img src="./assets/demo-2.png" alt="AI Agent Execution Report" width="49%" style="border-radius: 6px; border: 1px solid #e1e4e8;" />
   <br>
-  <em>(Left: AI Agent semantic analysis & classification / Right: CLI contract verification & three-phase safe execution)</em>
+  <em>(Left: Neatly organized GitHub Lists in action / Right: AI Agent execution and verified atomic apply report)</em>
 </p>
 <!-- DEMO_IMAGES_END -->
+
+---
+
+## ⚡ Quick Start: One-Prompt Setup for AI Agents
+
+If you are using **Claude Code / Cursor / Codex / Antigravity**, you don't even need to run commands manually. Simply copy and paste this single prompt to your AI assistant:
+
+> **🤖 One-Prompt Setup for Your AI Agent:**
+>
+> ```text
+> Please set up the Startidy GitHub Stars organizer for me: run npm install -g @haimu0427/startidy and verify the environment with startidy doctor; then read and load skills/startidy/SKILL.md from https://github.com/haimu0427/Startidy (or local workspace if cloned); once initialized, confirm readiness and await my instructions on how to organize my stars.
+> ```
+
+Once your AI Agent confirms readiness, simply reply: **"Please inspect my GitHub Stars, plan a clean taxonomy of lists, and help me organize them."** and let it do the rest!
 
 ---
 
@@ -35,9 +49,9 @@ As starred repositories accumulate into the hundreds or thousands, organizing th
 
 ---
 
-## ⚡ Quick Start
+## 🛠️ Manual Installation & Workflow
 
-Organize your GitHub Stars with your AI Agent in just **3 steps**:
+Prefer to manage things manually in your terminal? Just follow these 3 steps:
 
 ### 1. Installation
 
@@ -79,20 +93,15 @@ Startidy provides a standardized Agent Skill in [`skills/startidy/`](skills/star
 * **Codex / ChatGPT / Antigravity**: Symlink or copy `skills/startidy` to `.agents/skills/startidy`
 * **Cursor**: Add `skills/startidy/SKILL.md` to your project rules/skills
 
-### 3. Let your AI Take the Wheel!
+### 3. Three-Phase Execution Pipeline
 
-Open your AI terminal (such as Claude Code or Cursor) and simply instruct it:
-
-> **"Please inspect my GitHub Stars and help me organize them into clean, structured lists."**
-
-The AI Agent will autonomously follow the three-phase pipeline:
 1. **Observe**: Runs `startidy snapshot` to capture all starred repos and current lists.
-2. **Plan & Preview**: Categorizes repositories semantically, generates `plan.json`, and invokes `startidy preview` to compute a diff review for your inspection.
+2. **Plan & Preview**: AI categorizes repositories semantically, generates `plan.json`, and invokes `startidy preview` to compute a diff review for your inspection.
 3. **Safe Apply**: Once you review and approve the proposal, the AI executes `startidy apply` to safely sync the changes to GitHub.
 
 ---
 
-## 🛠️ CLI Command Reference
+## 📖 CLI Command Reference
 
 | Command | Description | Key Flags |
 | :--- | :--- | :--- |
