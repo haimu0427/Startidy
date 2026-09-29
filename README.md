@@ -12,7 +12,7 @@ Organize your starred repositories into structured GitHub User Lists safely, det
 - **Strict Data Contracts**: All data exchange is defined by JSON Schema 2020-12 (`snapshot`, `plan`, `review`).
 - **Safe & Incremental by Default**: Existing lists and memberships are preserved. Incremental mode prevents unauthorized deletions or renames.
 - **Preview & Review Before Execution**: Every planned change generates a verified `review.json` with cryptographic digest and atomic operations.
-- **Crash Recovery & Idempotence**: Interrupted runs can be inspected (`status`) and safely resumed (`apply --resume`) without duplicate writes or lost states.
+- **Crash Recovery & Idempotence**: Interrupted runs are journaled before each write. A uniquely verifiable remote result resumes safely; ambiguous create results stop as `needs_review` rather than risking a duplicate List.
 - **Zero Token Leakage**: Uses the authenticated GitHub CLI (`gh`) under the hood.
 
 ---
@@ -90,6 +90,22 @@ startidy status --run <runId> --json
 startidy apply --resume <runId> --json
 ```
 
+If status is `needs_review`, inspect the reported operation and remote List state first. Resume performs read-back reconciliation; it never blindly retries an unprovable List creation.
+
+Record an explicit resolution before resuming:
+
+```bash
+# Adopt an exactly matching existing List for a blocked CreateList
+startidy resolve --run <runId> --action adopt --list-id <listId> --json
+
+# Explicitly retry, accept current remote state, or stop the run
+startidy resolve --run <runId> --action retry --json
+startidy resolve --run <runId> --action accept-current --json
+startidy resolve --run <runId> --action abort --json
+
+startidy apply --resume <runId> --json
+```
+
 ---
 
 ## Command Reference
@@ -101,6 +117,7 @@ startidy apply --resume <runId> --json
 | `startidy details` | Retrieve READMEs with caching | `--snapshot <file>`, `--candidates`, `--repo-id <id...>`, `--offset <n>`, `--limit <n>`, `--out <file>` |
 | `startidy preview` | Validate plan and generate review | `--snapshot <file>`, `--plan <file>`, `--out <file>` |
 | `startidy apply` | Execute verified operations | `--review <file>`, `--resume <runId>` |
+| `startidy resolve` | Resolve a blocked operation | `--run <runId>`, `--action <action>`, `--list-id <id>` |
 | `startidy status` | Check run progress & journal | `--run <runId>` |
 
 All commands accept `--state-dir <dir>` to override the local state directory.

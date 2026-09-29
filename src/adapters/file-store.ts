@@ -9,7 +9,8 @@ import type {
   AccountProfile,
   AccountLedger,
   RunEvent,
-  RunResult
+  RunResult,
+  PendingRun
 } from '../core/ports.js';
 import type { Snapshot } from '../generated/snapshot.js';
 import type { Review } from '../generated/review.js';
@@ -58,16 +59,27 @@ export class FileStoreAdapter implements StorePort {
     await fsp.rename(tmpPath, filePath);
   }
 
+  private assertDigest(digest: string): void {
+    if (!/^[a-f0-9]{64}$/.test(digest)) {
+      throw new DomainError({
+        code: 'PLAN_INVALID',
+        message: 'Review digest must be a lowercase SHA-256 hex string'
+      });
+    }
+  }
+
   async acquireLock(account: { hostname: string; viewerId: string }, runId: string): Promise<LockHandle> {
     const accountDir = this.getAccountDir(account);
     await this.ensureDir(accountDir);
     const lockPath = path.join(accountDir, 'account.lock');
+    const ownerToken = crypto.randomUUID();
 
     const lockPayload = JSON.stringify(
       {
         runId,
         pid: process.pid,
         acquiredAt: new Date().toISOString(),
+        ownerToken,
         hostname: account.hostname,
         viewerId: account.viewerId
       },
@@ -75,67 +87,77 @@ export class FileStoreAdapter implements StorePort {
       2
     );
 
-    try {
-      // Exclusive creation 'wx'
+    const writeExclusiveLock = async (): Promise<void> => {
       const handle = await fsp.open(lockPath, 'wx');
       await handle.writeFile(lockPayload, 'utf8');
       await handle.close();
+    };
+
+    try {
+      await writeExclusiveLock();
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
-        // Lock file exists. Inspect it
-        let existingLock: { runId: string; pid: number; acquiredAt: string } | null = null;
+        let existingLock: { runId: string; pid: number; acquiredAt: string; ownerToken: string } | null = null;
         try {
           const content = await fsp.readFile(lockPath, 'utf8');
           existingLock = JSON.parse(content);
         } catch {
-          // Corrupted lock file
-        }
-
-        let isRunning = false;
-        let isExpired = false;
-
-        if (existingLock?.acquiredAt) {
-          const lockTime = new Date(existingLock.acquiredAt).getTime();
-          if (!Number.isNaN(lockTime)) {
-            const ageMs = Date.now() - lockTime;
-            const LOCK_TTL_MS = 30 * 60 * 1000; // 30 minutes
-            if (ageMs > LOCK_TTL_MS) {
-              isExpired = true;
-            }
-          }
-        }
-
-        if (existingLock?.pid && !isExpired) {
-          try {
-            process.kill(existingLock.pid, 0);
-            isRunning = true;
-          } catch (e: unknown) {
-            if ((e as NodeJS.ErrnoException).code === 'ESRCH') {
-              isRunning = false;
-            } else {
-              isRunning = true;
-            }
-          }
-        }
-
-        if (isRunning) {
           throw new DomainError({
             code: 'LOCK_HELD',
-            message: `Account lock is currently held by PID ${existingLock?.pid} (runId: ${existingLock?.runId ?? 'unknown'}, acquired: ${existingLock?.acquiredAt ?? 'unknown'})`,
+            message: `Account lock is unreadable and will not be reclaimed automatically: ${lockPath}`,
+            details: { lockPath }
+          });
+        }
+
+        if (
+          !existingLock?.runId ||
+          !Number.isInteger(existingLock.pid) ||
+          typeof existingLock.acquiredAt !== 'string' ||
+          !existingLock.ownerToken
+        ) {
+          throw new DomainError({
+            code: 'LOCK_HELD',
+            message: `Account lock is malformed and will not be reclaimed automatically: ${lockPath}`,
+            details: { lockPath, lock: existingLock }
+          });
+        }
+
+        let processIsDead = false;
+        try {
+          process.kill(existingLock.pid, 0);
+        } catch (probeError: unknown) {
+          if ((probeError as NodeJS.ErrnoException).code === 'ESRCH') {
+            processIsDead = true;
+          } else {
+            // EPERM and unknown probe failures are not proof that the owner died.
+            throw new DomainError({
+              code: 'LOCK_HELD',
+              message: `Account lock is held by PID ${existingLock.pid} (runId: ${existingLock.runId})`,
+              details: { lock: existingLock }
+            });
+          }
+        }
+
+        if (!processIsDead) {
+          throw new DomainError({
+            code: 'LOCK_HELD',
+            message: `Account lock is currently held by PID ${existingLock.pid} (runId: ${existingLock.runId}, acquired: ${existingLock.acquiredAt})`,
             details: { lock: existingLock }
           });
         }
 
-        // Stale lock: remove and retry once
+        // A dead owner can be reclaimed. Rename first so concurrent reclaimers
+        // cannot unlink a newly acquired replacement lock.
+        const quarantinePath = `${lockPath}.stale.${crypto.randomUUID()}`;
         try {
-          await fsp.unlink(lockPath);
-          const handle = await fsp.open(lockPath, 'wx');
-          await handle.writeFile(lockPayload, 'utf8');
-          await handle.close();
+          await fsp.rename(lockPath, quarantinePath);
+          await writeExclusiveLock();
+          await fsp.unlink(quarantinePath).catch(() => undefined);
         } catch (retryErr) {
+          await fsp.unlink(quarantinePath).catch(() => undefined);
           throw new DomainError({
             code: 'LOCK_HELD',
-            message: 'Failed to acquire account lock after clearing stale lock',
+            message: 'Failed to acquire account lock after safely reclaiming a dead owner',
             cause: retryErr
           });
         }
@@ -149,8 +171,8 @@ export class FileStoreAdapter implements StorePort {
       release: async () => {
         try {
           const content = await fsp.readFile(lockPath, 'utf8');
-          const data = JSON.parse(content);
-          if (data.runId === runId) {
+          const data = JSON.parse(content) as { runId?: string; ownerToken?: string };
+          if (data.runId === runId && data.ownerToken === ownerToken) {
             await fsp.unlink(lockPath);
           }
         } catch {
@@ -226,10 +248,16 @@ export class FileStoreAdapter implements StorePort {
 
   async createRun(account: { hostname: string; viewerId: string }, runId: string, review: Review): Promise<void> {
     validateReview(review);
+    this.assertDigest(review.digest);
     const runDir = path.join(this.getAccountDir(account), 'runs', runId);
     await this.ensureDir(runDir);
     const reviewPath = path.join(runDir, 'review.json');
     await this.atomicWriteFile(reviewPath, JSON.stringify(review, null, 2));
+
+    const byDigestDir = path.join(this.getAccountDir(account), 'runs', 'by-digest');
+    await this.ensureDir(byDigestDir);
+    const digestPointerPath = path.join(byDigestDir, `${review.digest}.json`);
+    await this.atomicWriteFile(digestPointerPath, JSON.stringify({ runId, createdAt: new Date().toISOString() }));
   }
 
   async appendRunEvent(
@@ -296,6 +324,72 @@ export class FileStoreAdapter implements StorePort {
       }
       throw err;
     }
+  }
+
+  async findRunByReviewDigest(
+    account: { hostname: string; viewerId: string },
+    digest: string
+  ): Promise<{ runId: string; result: RunResult | null } | null> {
+    this.assertDigest(digest);
+    const digestPointerPath = path.join(this.getAccountDir(account), 'runs', 'by-digest', `${digest}.json`);
+    try {
+      const content = await fsp.readFile(digestPointerPath, 'utf8');
+      const { runId } = JSON.parse(content) as { runId: string };
+      const result = await this.loadRunResult(account, runId);
+      return { runId, result };
+    } catch {
+      // Fallback for runs created before the digest pointer existed.
+      const runsDir = path.join(this.getAccountDir(account), 'runs');
+      try {
+        const entries = await fsp.readdir(runsDir, { withFileTypes: true });
+        const matches: Array<{ runId: string; result: RunResult | null; createdAt: string }> = [];
+        for (const entry of entries) {
+          if (entry.isDirectory() && entry.name !== 'by-digest') {
+            const review = await this.loadReview(account, entry.name);
+            if (review && review.digest === digest) {
+              const result = await this.loadRunResult(account, entry.name);
+              matches.push({ runId: entry.name, result, createdAt: review.createdAt });
+            }
+          }
+        }
+        matches.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const selected = matches.find((match) => match.result?.status === 'completed') ?? matches[0];
+        if (selected) return { runId: selected.runId, result: selected.result };
+      } catch {
+        return null;
+      }
+      return null;
+    }
+  }
+
+  async listPendingRuns(account: { hostname: string; viewerId: string }): Promise<PendingRun[]> {
+    const runsDir = path.join(this.getAccountDir(account), 'runs');
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = await fsp.readdir(runsDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const runDirs = entries.filter((e) => e.isDirectory() && e.name !== 'by-digest');
+    const pending: PendingRun[] = [];
+
+    for (const dir of runDirs) {
+      const runId = dir.name;
+      const review = await this.loadReview(account, runId);
+      if (!review) continue;
+
+      const result = await this.loadRunResult(account, runId);
+      const events = await this.getRunEvents(account, runId);
+      const terminalFromJournal = events.some(
+        (event) => event.phase === 'run_finish' || event.phase === 'run_cancelled'
+      );
+      if (!terminalFromJournal && (!result || (result.status !== 'completed' && result.status !== 'cancelled'))) {
+        pending.push({ runId, review, result });
+      }
+    }
+    pending.sort((a, b) => b.review.createdAt.localeCompare(a.review.createdAt));
+    return pending;
   }
 
   async getCachedReadme(accountKey: string, repoId: string, sha?: string): Promise<string | null> {

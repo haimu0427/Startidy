@@ -594,13 +594,8 @@ export class GitHubGhAdapter implements GitHubPort {
     changes: { name?: string; description?: string | null; isPrivate?: boolean };
   }): Promise<{ id: string }> {
     const mutation = `
-      mutation UpdateList($listId: ID!, $name: String, $description: String, $isPrivate: Boolean) {
-        updateUserList(input: {
-          listId: $listId,
-          name: $name,
-          description: $description,
-          isPrivate: $isPrivate
-        }) {
+      mutation UpdateList($input: UpdateUserListInput!) {
+        updateUserList(input: $input) {
           list {
             id
           }
@@ -608,11 +603,21 @@ export class GitHubGhAdapter implements GitHubPort {
       }
     `;
 
+    const payload: Record<string, unknown> = {
+      listId: input.listId
+    };
+    if (input.changes.name !== undefined) {
+      payload.name = input.changes.name;
+    }
+    if ('description' in input.changes) {
+      payload.description = input.changes.description;
+    }
+    if (input.changes.isPrivate !== undefined) {
+      payload.isPrivate = input.changes.isPrivate;
+    }
+
     const res = await this.graphql<{ updateUserList: { list: { id: string } } }>(mutation, {
-      listId: input.listId,
-      name: input.changes.name,
-      description: input.changes.description ?? null,
-      isPrivate: input.changes.isPrivate
+      input: payload
     });
 
     return res.updateUserList.list;
@@ -656,9 +661,11 @@ export class GitHubGhAdapter implements GitHubPort {
       listIds: input.listIds
     });
 
+    const updatedListIds = res.updateUserListsForItem.lists.map((l) => l.id);
+
     return {
       repositoryId: input.repositoryId,
-      listIds: res.updateUserListsForItem.lists.map((l) => l.id)
+      listIds: updatedListIds
     };
   }
 
@@ -741,5 +748,134 @@ export class GitHubGhAdapter implements GitHubPort {
       repositoryIds: repoIds,
       unsupportedItemCount: unsupported
     };
+  }
+
+  async readLists(): Promise<RemoteListInfo[]> {
+    const lists: RemoteListInfo[] = [];
+    let listCursor: string | null = null;
+    let hasMoreLists = true;
+
+    while (hasMoreLists) {
+      const query = `
+        query FetchViewerListsWithItems($cursor: String) {
+          viewer {
+            lists(first: 100, after: $cursor) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                name
+                description
+                isPrivate
+                items(first: 100) {
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
+                  nodes {
+                    __typename
+                    ... on Repository {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const res: {
+        viewer: {
+          lists: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            nodes: Array<{
+              id: string;
+              name: string;
+              description: string | null;
+              isPrivate: boolean;
+              items: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: Array<{ __typename: string; id?: string }>;
+              };
+            }>;
+          };
+        };
+      } = await this.graphql(query, { cursor: listCursor });
+
+      for (const listNode of res.viewer.lists.nodes) {
+        const repositoryIds: string[] = [];
+        let unsupportedItemCount = 0;
+        for (const item of listNode.items.nodes) {
+          if (item.__typename === 'Repository' && item.id) {
+            repositoryIds.push(item.id);
+          } else {
+            unsupportedItemCount++;
+          }
+        }
+
+        let itemCursor = listNode.items.pageInfo.endCursor;
+        let hasMoreItems = listNode.items.pageInfo.hasNextPage;
+        while (hasMoreItems) {
+          const itemsQuery = `
+            query FetchListItemsOnly($listId: ID!, $cursor: String) {
+              node(id: $listId) {
+                ... on UserList {
+                  items(first: 100, after: $cursor) {
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                    nodes {
+                      __typename
+                      ... on Repository {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `;
+          const itemRes: {
+            node: {
+              items: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: Array<{ __typename: string; id?: string }>;
+              };
+            } | null;
+          } = await this.graphql(itemsQuery, { listId: listNode.id, cursor: itemCursor });
+
+          if (itemRes.node?.items?.nodes) {
+            for (const item of itemRes.node.items.nodes) {
+              if (item.__typename === 'Repository' && item.id) {
+                repositoryIds.push(item.id);
+              } else {
+                unsupportedItemCount++;
+              }
+            }
+          }
+
+          hasMoreItems = itemRes.node?.items?.pageInfo?.hasNextPage ?? false;
+          itemCursor = itemRes.node?.items?.pageInfo?.endCursor ?? null;
+        }
+
+        lists.push({
+          id: listNode.id,
+          name: listNode.name,
+          description: listNode.description ?? null,
+          isPrivate: listNode.isPrivate,
+          repositoryIds,
+          unsupportedItemCount
+        });
+      }
+
+      hasMoreLists = res.viewer.lists.pageInfo.hasNextPage;
+      listCursor = res.viewer.lists.pageInfo.endCursor;
+    }
+
+    return lists;
   }
 }

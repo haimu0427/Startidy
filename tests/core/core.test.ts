@@ -192,6 +192,26 @@ describe('Phase 1: Core Logic & Contract Verification', () => {
       assert.doesNotThrow(() => validatePlanPolicy({ plan, snapshot }));
     });
 
+    it('rejects normalized new-list names that collide with snapshot lists', () => {
+      snapshot = buildSnapshot({ remote: sampleRemote });
+      const plan: Plan = {
+        schemaVersion: '1.0',
+        account: { hostname: 'github.com', viewerId: 'U_123' },
+        baseSnapshotId: snapshot.snapshotId,
+        mode: 'incremental',
+        scope: { repoIds: ['R_2'], listIds: [] },
+        lists: { create: [{ key: 'collision', name: '  developer tools  ', isPrivate: true }], update: [], delete: [] },
+        decisions: [{ repoId: 'R_2', outcome: 'assign', addTo: [{ newListKey: 'collision' }], removeFrom: [], reason: 'test' }]
+      };
+
+      assert.throws(() => validatePlanSemantics(plan, snapshot), (err: unknown) => {
+        assert.ok(err instanceof DomainError);
+        assert.equal(err.code, 'PLAN_INVALID');
+        assert.match(err.message, /conflicts with an existing snapshot list/);
+        return true;
+      });
+    });
+
     it('rejects list deletion or updates in incremental mode', () => {
       snapshot = buildSnapshot({ remote: sampleRemote });
 

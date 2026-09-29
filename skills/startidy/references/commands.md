@@ -45,7 +45,7 @@ cat plan.json | startidy preview --snapshot snapshot.json --plan - --out review.
 ```
 
 ### `startidy apply`
-Executes planned atomic operations against GitHub. Acquires account-level lock, checks remote state, tracks execution journal, and updates local ledger.
+Executes planned atomic operations against GitHub. Acquires an account-level lock, revalidates the review against its saved snapshot, records every mutation before sending it, reads the remote result back, and then updates local ledger state.
 ```bash
 # Apply verified review
 startidy apply --review review.json --json
@@ -53,6 +53,23 @@ startidy apply --review review.json --json
 # Resume interrupted run
 startidy apply --resume run_1720000000_abc --json
 ```
+
+An interrupted create whose remote outcome cannot be proven uniquely returns `needs_review` (exit code 6). Inspect `status` and resolve the remote ambiguity before resuming; Startidy will not blindly create another List.
+
+### `startidy resolve`
+Records a deliberate resolution for the single operation blocking a `needs_review` run. It does not infer user intent.
+
+```bash
+# CreateList only: adopt an exactly matching remote List
+startidy resolve --run run_1720000000_abc --action adopt --list-id L_kgDO... --json
+
+# Retry from current state, accept current state (non-CreateList), or cancel the run
+startidy resolve --run run_1720000000_abc --action retry --json
+startidy resolve --run run_1720000000_abc --action accept-current --json
+startidy resolve --run run_1720000000_abc --action abort --json
+```
+
+After `adopt`, `retry`, or `accept-current`, run `apply --resume <runId>`. `abort` is terminal and preserves changes already verified before the blocked operation.
 
 ### `startidy status`
 Inspects past or interrupted run progress.
