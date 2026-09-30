@@ -53,11 +53,22 @@ As starred repositories accumulate into the hundreds or thousands, organizing th
 
 Prefer to manage things manually in your terminal? Just follow these 3 steps:
 
-### 1. Installation
+### 1. Environment & Installation
 
-Ensure Node.js (>= 22) and GitHub CLI (`gh auth login`) are installed and authenticated.
+Running Startidy requires **Node.js (>= 22)** and an authenticated **GitHub CLI (`gh`)**.
 
-#### Option A: Global Install via npm (Recommended)
+#### Prerequisites: Install & Authenticate GitHub CLI
+
+```bash
+# See: https://cli.github.com/
+
+# Authenticate with your GitHub account
+gh auth login
+```
+
+#### Install Startidy
+
+**Option A: Global Install via npm (Recommended)**
 
 ```bash
 npm install -g @haimu0427/startidy
@@ -65,7 +76,7 @@ npm install -g @haimu0427/startidy
 npx @haimu0427/startidy doctor
 ```
 
-#### Option B: Build from Source
+**Option B: Build from Source**
 
 ```bash
 # Clone the repository
@@ -96,8 +107,8 @@ Startidy provides a standardized Agent Skill in [`skills/startidy/`](skills/star
 ### 3. Three-Phase Execution Pipeline
 
 1. **Observe**: Runs `startidy snapshot` to capture all starred repos and current lists.
-2. **Plan & Preview**: AI categorizes repositories semantically, generates `plan.json`, and invokes `startidy preview` to compute a diff review for your inspection.
-3. **Safe Apply**: Once you review and approve the proposal, the AI executes `startidy apply` to safely sync the changes to GitHub.
+2. **Plan & Preview**: The Agent categorizes repositories semantically, generates `plan.json`, and invokes `startidy preview` to generate a diff preview for user review.
+3. **Safe Apply**: Once the user approves the plan, the Agent executes `startidy apply` to safely sync changes to GitHub.
 
 ---
 
@@ -119,14 +130,7 @@ Startidy provides a standardized Agent Skill in [`skills/startidy/`](skills/star
 
 This project is built upon and inspired by [@hellosunghyun](https://github.com/hellosunghyun)'s original repository [hellosunghyun/startidy](https://github.com/hellosunghyun/startidy).
 
-Starting from v2, this project underwent a complete architectural redesign: eliminating runtime LLM dependencies in favor of native Agent Skills, introducing contract-driven schema validation, and providing crash-safe execution with read-back reconciliation. Deep gratitude to the original author for pioneering automated GitHub Star management!
-
----
-
-## 📚 Guides for Developers & Agents
-
-- [AGENTS.md](AGENTS.md): Architectural contract and debugging rules for Codex, Cursor, Antigravity, etc.
-- [CLAUDE.md](CLAUDE.md): Build and workflow cheat sheet for Claude Code.
+v2 has been completely redesigned: no external LLM API configuration is required, directly leveraging your everyday AI assistant for taxonomy planning. The execution process provides strict data validation, diff preview, and resume capability across interruptions. Thanks to the original author!
 
 ---
 
